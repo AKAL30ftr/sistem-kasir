@@ -5,4 +5,8 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: './', // Support for relative paths (Live Server)
+  server: {
+    port: 5173,
+    strictPort: true, // Fail if port is busy
+  }
 })

@@ -4,7 +4,7 @@ import type { CartItem, Transaction } from '../types';
 
 export const transactionService = {
   createTransaction: async (
-    transactionData: Omit<Transaction, 'id' | 'created_at' | 'items'>,
+    transactionData: Omit<Transaction, 'id' | 'created_at' | 'items'> & { shift_id?: string },
     cartItems: CartItem[]
   ): Promise<string> => {
 
@@ -17,6 +17,7 @@ export const transactionService = {
         .from('transactions')
         .insert([{
           user_id: transactionData.user_id,
+          shift_id: transactionData.shift_id,
           username: transactionData.username,
           total_amount: transactionData.total_amount,
           payment_method: transactionData.payment_method,

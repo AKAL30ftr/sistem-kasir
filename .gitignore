@@ -126,3 +126,13 @@ Desktop.ini
 # Misc
 .DS_Store
 *.pem
+
+# Editor Directories and Files
+.idea
+.vscode
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.sublime-project
+

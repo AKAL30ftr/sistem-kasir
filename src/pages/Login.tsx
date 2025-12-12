@@ -13,6 +13,29 @@ export default function Login() {
     e.preventDefault();
     const success = await login(username, password);
     if (success) {
+      // Log the login (Fire & Forget)
+      // We retrieve user ID from auth context or directly if possible. 
+      // Since 'login' returns boolean, we might need to rely on the effect or just fetch user again?
+      // Actually, 'login' in context sets the user state. But state update is async.
+      // Better way: let 'login' return the user object or just delay logging?
+      // Quick fix for MVP: Context likely has the user immediately after await if it was updated,
+      // BUT React batching might block it.
+      // Let's modify: we can just fetch the user from supabase or trust the session exists.
+      
+      // Let's import userService and supabase client directly here or use a small timeout?
+      // Safest: The AuthContext 'login' should probably return the user, but let's check it.
+      // Assumption: 'login' handles auth state.
+      // Let's try to get session directly to get ID for logging.
+      
+      try {
+        const { data: { user } } = await import('../supabase').then(m => m.supabase.auth.getUser());
+        if (user) {
+             await import('../services/userService').then(m => m.userService.logLogin(user.id));
+        }
+      } catch (err) {
+        console.error("Login log failed", err);
+      }
+
       navigate('/');
     }
   };

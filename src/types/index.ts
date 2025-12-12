@@ -21,10 +21,60 @@ export interface Transaction {
   id?: string;
   user_id: string; // cashier
   username: string; // cashier name snapshot
+  shift_id?: string; // LINKED TO SHIFT
   total_amount: number;
   payment_method: 'CASH' | 'QRIS';
   cash_received: number;
   change_amount: number;
   items: CartItem[]; // Snapshot of items
   created_at: any; // Timestamp
+}
+
+export interface User {
+  id: string;
+  username: string;
+  role: 'admin' | 'cashier';
+  pin?: string;
+  created_at?: string;
+}
+
+export interface Shift {
+  id: string;
+  user_id: string;
+  start_time: string;
+  end_time?: string;
+  start_cash: number;
+  end_cash_system?: number;
+  end_cash_actual?: number;
+  variance?: number;
+  status: 'OPEN' | 'CLOSED';
+  note?: string;
+  created_at?: string;
+}
+
+export interface PettyCash {
+  id: string;
+  shift_id: string;
+  user_id: string;
+  amount: number;
+  type: 'CASH_IN' | 'CASH_OUT';
+  reason: string;
+  created_at?: string;
+}
+
+export interface KeyboardShortcut {
+  id: string;
+  user_id?: string;
+  key_code: string;
+  product_id: string;
+  created_at?: string;
+}
+
+export interface LoginLog {
+  id: string;
+  user_id: string;
+  username?: string; // Optional (joined)
+  timestamp: string;
+  device_info?: string;
+  ip_address?: string;
 }
