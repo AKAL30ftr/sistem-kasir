@@ -70,11 +70,4 @@ export interface KeyboardShortcut {
   created_at?: string;
 }
 
-export interface LoginLog {
-  id: string;
-  user_id: string;
-  username?: string; // Optional (joined)
-  timestamp: string;
-  device_info?: string;
-  ip_address?: string;
-}
+

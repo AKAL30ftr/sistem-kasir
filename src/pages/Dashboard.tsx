@@ -15,7 +15,7 @@ import { NoShiftView } from '../components/dashboard/NoShiftView';
 import { CashDrawerCard } from '../components/dashboard/CashDrawerCard';
 import { PerformanceCard } from '../components/dashboard/PerformanceCard';
 import { AlertCard } from '../components/dashboard/AlertCard';
-import { RecentLoginsCard } from '../components/dashboard/RecentLoginsCard';
+
 import { RecentTransactionsCard } from '../components/dashboard/RecentTransactionsCard';
 import { PopularProductsCard } from '../components/dashboard/PopularProductsCard';
 import { SalesChartCard } from '../components/dashboard/SalesChartCard';
@@ -192,7 +192,7 @@ export default function Dashboard() {
             </div>
 
             {/* ROW 3: Dense Data Grid */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 h-auto items-stretch">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 h-auto items-stretch">
                 {/* Main: Recent Transactions (Takes up more space if needed, or equal) */}
                 <div className="xl:col-span-1 h-full">
                      <RecentTransactionsCard />
@@ -203,10 +203,7 @@ export default function Dashboard() {
                      <PopularProductsCard />
                 </div>
 
-                {/* Right: Login Activity */}
-                <div className="xl:col-span-1 h-full">
-                     <RecentLoginsCard />
-                </div>
+
             </div>
           </div>
         )}

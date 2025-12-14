@@ -27,14 +27,7 @@ export default function Login() {
       // Assumption: 'login' handles auth state.
       // Let's try to get session directly to get ID for logging.
       
-      try {
-        const { data: { user } } = await import('../supabase').then(m => m.supabase.auth.getUser());
-        if (user) {
-             await import('../services/userService').then(m => m.userService.logLogin(user.id));
-        }
-      } catch (err) {
-        console.error("Login log failed", err);
-      }
+// Login logging removed
 
       navigate('/');
     }

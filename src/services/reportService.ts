@@ -27,6 +27,24 @@ export const reportService = {
     })) as Transaction[];
   },
 
+  // Helper helper to calculate stats
+  calculateStats: (data: any[]) => {
+      const stats = {
+          totalSales: 0,
+          count: data.length,
+          cashTotal: 0,
+          qrisTotal: 0
+      };
+
+      data.forEach((t: any) => {
+          const amount = Number(t.total_amount);
+          stats.totalSales += amount;
+          if (t.payment_method === 'CASH') stats.cashTotal += amount;
+          if (t.payment_method === 'QRIS') stats.qrisTotal += amount;
+      });
+      return stats;
+  },
+
   getTodayStats: async () => {
     const startOfDay = new Date();
     startOfDay.setHours(0,0,0,0);
@@ -41,21 +59,7 @@ export const reportService = {
 
     if (error) return { totalSales: 0, count: 0, cashTotal: 0, qrisTotal: 0 };
 
-    const stats = {
-        totalSales: 0,
-        count: data.length,
-        cashTotal: 0,
-        qrisTotal: 0
-    };
-
-    data.forEach((t: any) => {
-        const amount = Number(t.total_amount);
-        stats.totalSales += amount;
-        if (t.payment_method === 'CASH') stats.cashTotal += amount;
-        if (t.payment_method === 'QRIS') stats.qrisTotal += amount;
-    });
-
-    return stats;
+    return reportService.calculateStats(data);
   },
 
   // Get Stats SPECIFIC to a Shift (for Cash Drawer)
@@ -67,21 +71,7 @@ export const reportService = {
 
     if (error) return { totalSales: 0, count: 0, cashTotal: 0, qrisTotal: 0 };
 
-    const stats = {
-        totalSales: 0,
-        count: data.length,
-        cashTotal: 0,
-        qrisTotal: 0
-    };
-
-    data.forEach((t: any) => {
-        const amount = Number(t.total_amount);
-        stats.totalSales += amount;
-        if (t.payment_method === 'CASH') stats.cashTotal += amount;
-        if (t.payment_method === 'QRIS') stats.qrisTotal += amount;
-    });
-
-    return stats;
+    return reportService.calculateStats(data);
   },
 
   // Get Sales Chart Data (Aggregated by Day)
@@ -146,13 +136,5 @@ export const reportService = {
       const yesterdaySales = yesterdayData?.reduce((acc, t) => acc + t.total_amount, 0) || 0;
 
       return { todaySales, yesterdaySales };
-  },
-
-  // Simulate reconciliation save (since we don't have a table UI for it yet)
-  saveReconciliation: async (data: any) => {
-      const { error } = await supabase
-        .from('cash_balances')
-        .insert([data]);
-      if (error) throw error;
   }
 };
