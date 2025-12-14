@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import { shiftService } from '../services/shiftService';
 import { reportService } from '../services/reportService';
 import { productService } from '../services/productService';
@@ -27,6 +28,7 @@ import { PettyCashModal } from '../components/modals/PettyCashModal';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { parkedOrderCount } = useCart();
   const navigate = useNavigate();
   
   const [currentShift, setCurrentShift] = useState<Shift | null>(null);
@@ -160,7 +162,14 @@ export default function Dashboard() {
         <ShiftBanner 
           shift={currentShift} 
           onOpenPettyCash={() => setShowPettyModal(true)}
-          onEndShift={() => setShowEndModal(true)}
+          onEndShift={() => {
+            // Check for parked orders before allowing end shift
+            if (parkedOrderCount > 0) {
+              toast.error(`Masih ada ${parkedOrderCount} order yang di-hold. Selesaikan atau hapus terlebih dahulu.`);
+              return;
+            }
+            setShowEndModal(true);
+          }}
         />
       </div>
 

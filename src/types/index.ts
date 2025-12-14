@@ -27,7 +27,15 @@ export interface Transaction {
   cash_received: number;
   change_amount: number;
   items: CartItem[]; // Snapshot of items
-  created_at: any; // Timestamp
+  created_at: string; // Timestamp
+  // Order notes
+  customer_name?: string;
+  notes?: string;
+  // Refund fields
+  status?: 'COMPLETED' | 'VOIDED' | 'REFUNDED';
+  voided_by?: string;
+  void_reason?: string;
+  voided_at?: string;
 }
 
 export interface User {
@@ -70,4 +78,9 @@ export interface KeyboardShortcut {
   created_at?: string;
 }
 
-
+export interface ParkedOrder {
+  id: string;
+  items: CartItem[];
+  total: number;
+  parkedAt: string;
+}

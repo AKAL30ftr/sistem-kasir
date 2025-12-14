@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { ShoppingCart, Minus, Plus, Trash2, AlertCircle } from 'lucide-react';
+import { ShoppingCart, Minus, Plus, Trash2, AlertCircle, Pause, Clock } from 'lucide-react';
 import { productService } from '../services/productService';
 import { transactionService } from '../services/transactionService';
 import { useAuth } from '../context/AuthContext';
@@ -12,6 +12,7 @@ import ReceiptModal from '../components/ReceiptModal';
 import { CategoryTabs } from '../components/pos/CategoryTabs';
 import { SearchBar } from '../components/pos/SearchBar';
 import { useHotkeys } from '../hooks/useHotkeys';
+import { ParkedOrdersModal } from '../components/modals/ParkedOrdersModal';
 
 import { shiftService } from '../services/shiftService';
 
@@ -27,8 +28,13 @@ export default function POS() {
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null);
+  const [isParkedOrdersOpen, setIsParkedOrdersOpen] = useState(false);
+  
+  // Order notes state
+  const [customerName, setCustomerName] = useState('');
+  const [orderNotes, setOrderNotes] = useState('');
 
-  const { cartItems, addToCart, removeFromCart, updateQuantity, cartTotal, clearCart } = useCart();
+  const { cartItems, addToCart, removeFromCart, updateQuantity, cartTotal, clearCart, parkOrder, getParkedOrders, resumeOrder, deleteParkedOrder, parkedOrderCount } = useCart();
   const { user } = useAuth();
   
   // Shortcuts
@@ -96,7 +102,9 @@ export default function POS() {
             total_amount: cartTotal,
             payment_method: paymentMethod,
             cash_received: cashReceived,
-            change_amount: cashReceived - cartTotal
+            change_amount: cashReceived - cartTotal,
+            customer_name: customerName || undefined,
+            notes: orderNotes || undefined
         },
         cartItems
       );
@@ -110,12 +118,16 @@ export default function POS() {
         cash_received: cashReceived,
         change_amount: cashReceived - cartTotal,
         items: [...cartItems],
-        created_at: new Date()
+        created_at: new Date().toISOString(),
+        customer_name: customerName || undefined,
+        notes: orderNotes || undefined
       };
 
       setLastTransaction(transaction);
       setIsPaymentOpen(false);
       clearCart();
+      setCustomerName('');
+      setOrderNotes('');
       toast.success("Transaction successful!");
       loadProducts(); // Reload stock
     } catch (error) {
@@ -125,7 +137,32 @@ export default function POS() {
     }
   };
 
+  // SHIFT LOCK: Block POS if no active shift
+  if (!isLoading && !currentShiftId) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-8rem)] text-center">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md">
+          <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle size={32} className="text-amber-600" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Shift Belum Dimulai</h2>
+          <p className="text-gray-600 mb-6">
+            Anda harus memulai shift terlebih dahulu sebelum dapat melayani transaksi.
+            Silakan ke Dashboard untuk memulai shift.
+          </p>
+          <button
+            onClick={() => window.location.hash = '#/'}
+            className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition"
+          >
+            Ke Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
+    <>
     <div className="flex h-[calc(100vh-4rem)] gap-6 overflow-hidden">
       {/* Modals */}
       {isPaymentOpen && (
@@ -207,10 +244,18 @@ export default function POS() {
 
       {/* RIGHT COLUMN: Cart Panel (35%) */}
       <div className="w-[35%] bg-white rounded-lg shadow-md flex flex-col overflow-hidden border border-gray-200">
-        <div className="p-4 border-b border-gray-100 bg-gray-50">
+        <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
           <h2 className="text-lg font-bold flex items-center gap-2 text-gray-800">
             <ShoppingCart size={20} /> Current Order
           </h2>
+          {parkedOrderCount > 0 && (
+            <button
+              onClick={() => setIsParkedOrdersOpen(true)}
+              className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              <Clock size={16} /> Parked ({parkedOrderCount})
+            </button>
+          )}
         </div>
 
         {/* Cart Items List */}
@@ -272,15 +317,28 @@ export default function POS() {
                </div>
            )}
         
-          <div className="space-y-2 mb-4 text-sm text-gray-600">
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span>Rp {cartTotal.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Tax (10%)</span>
-              <span>Rp 0</span> 
-            </div>
+          <div className="space-y-3 mb-4">
+            {/* Customer Name */}
+            <input
+              type="text"
+              placeholder="Nama customer (opsional)"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            />
+            {/* Order Notes */}
+            <input
+              type="text"
+              placeholder="Catatan order (opsional)"
+              value={orderNotes}
+              onChange={(e) => setOrderNotes(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            />
+          </div>
+          
+          <div className="flex justify-between mb-4 text-sm text-gray-600">
+            <span>Subtotal</span>
+            <span>Rp {cartTotal.toLocaleString()}</span>
           </div>
           
           <div className="flex justify-between mb-6 text-xl font-bold text-gray-800">
@@ -288,19 +346,45 @@ export default function POS() {
             <span>Rp {cartTotal.toLocaleString()}</span>
           </div>
 
-          <button
-            disabled={cartItems.length === 0}
-            onClick={() => setIsPaymentOpen(true)}
-            className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-transform transform active:scale-[0.98] ${
-                cartItems.length === 0 
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-xl'
-            }`}
-          >
-            Bayar Rp {cartTotal.toLocaleString()}
-          </button>
+          <div className="flex gap-2">
+            {/* Hold Order Button */}
+            <button
+              disabled={cartItems.length === 0}
+              onClick={() => parkOrder()}
+              className={`flex-1 py-4 rounded-xl font-bold text-lg border-2 transition-transform transform active:scale-[0.98] ${
+                  cartItems.length === 0 
+                  ? 'border-gray-200 text-gray-400 cursor-not-allowed' 
+                  : 'border-orange-500 text-orange-500 hover:bg-orange-50'
+              }`}
+            >
+              <Pause size={18} className="inline mr-2" />Hold
+            </button>
+            
+            {/* Pay Button */}
+            <button
+              disabled={cartItems.length === 0}
+              onClick={() => setIsPaymentOpen(true)}
+              className={`flex-[2] py-4 rounded-xl font-bold text-lg shadow-lg transition-transform transform active:scale-[0.98] ${
+                  cartItems.length === 0 
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                  : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-xl'
+              }`}
+            >
+              Bayar Rp {cartTotal.toLocaleString()}
+            </button>
+          </div>
         </div>
       </div>
     </div>
+
+    {/* Parked Orders Modal */}
+    <ParkedOrdersModal
+      isOpen={isParkedOrdersOpen}
+      orders={getParkedOrders()}
+      onClose={() => setIsParkedOrdersOpen(false)}
+      onResume={(id) => { resumeOrder(id); setIsParkedOrdersOpen(false); }}
+      onDelete={deleteParkedOrder}
+    />
+    </>
   );
 }

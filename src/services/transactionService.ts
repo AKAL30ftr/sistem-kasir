@@ -1,6 +1,7 @@
 
 import { supabase } from '../supabase';
 import type { CartItem, Transaction } from '../types';
+import { offlineService } from './offlineService';
 
 export const transactionService = {
   createTransaction: async (
@@ -8,8 +9,13 @@ export const transactionService = {
     cartItems: CartItem[]
   ): Promise<string> => {
 
-    // Start a simplified flow since Supabase-js doesn't support complex transactions in client lib easily
-    // We will do: 1. Create Transaction -> 2. Update Stocks loop (Optimistic)
+    // Check if offline - queue transaction instead
+    if (!offlineService.isOnline()) {
+      const queueId = offlineService.queueTransaction(transactionData, cartItems);
+      return queueId; // Return queue ID as "transaction ID" for receipt
+    }
+
+    // Online flow - proceed normally
 
     try {
       // 1. Insert Transaction
@@ -23,7 +29,10 @@ export const transactionService = {
           payment_method: transactionData.payment_method,
           cash_received: transactionData.cash_received,
           change_amount: transactionData.change_amount,
-          items: cartItems // Stores as JSONB
+          items: cartItems, // Stores as JSONB
+          status: 'COMPLETED',
+          customer_name: transactionData.customer_name || null,
+          notes: transactionData.notes || null
         }])
         .select()
         .single();
@@ -55,6 +64,45 @@ export const transactionService = {
 
     } catch (error) {
       console.error("Transaction failed:", error);
+      throw error;
+    }
+  },
+
+  // Refund a transaction (no stock restoration - most refunds are for defective products)
+  voidTransaction: async (
+    transactionId: string,
+    voidedBy: string,
+    reason: string
+  ): Promise<void> => {
+    try {
+      // 1. Get the transaction to check status
+      const { data: tx, error: fetchError } = await supabase
+        .from('transactions')
+        .select('status')
+        .eq('id', transactionId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!tx) throw new Error('Transaction not found');
+      if (tx.status === 'VOIDED') throw new Error('Transaction already refunded');
+
+      // 2. Update transaction status to VOIDED
+      const { error: updateError } = await supabase
+        .from('transactions')
+        .update({
+          status: 'VOIDED',
+          voided_by: voidedBy,
+          void_reason: reason,
+          voided_at: new Date().toISOString()
+        })
+        .eq('id', transactionId);
+
+      if (updateError) throw updateError;
+
+      // Note: Stock is NOT restored - refunds are typically for defective/consumed products
+
+    } catch (error) {
+      console.error("Refund transaction failed:", error);
       throw error;
     }
   }

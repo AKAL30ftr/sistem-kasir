@@ -55,7 +55,8 @@ export const reportService = {
         .from('transactions')
         .select('total_amount, payment_method')
         .gte('created_at', startOfDay.toISOString())
-        .lte('created_at', endOfDay.toISOString());
+        .lte('created_at', endOfDay.toISOString())
+        .neq('status', 'VOIDED'); // Exclude refunded
 
     if (error) return { totalSales: 0, count: 0, cashTotal: 0, qrisTotal: 0 };
 
@@ -67,7 +68,8 @@ export const reportService = {
     const { data, error } = await supabase
         .from('transactions')
         .select('total_amount, payment_method')
-        .eq('shift_id', shiftId);
+        .eq('shift_id', shiftId)
+        .neq('status', 'VOIDED'); // Exclude refunded
 
     if (error) return { totalSales: 0, count: 0, cashTotal: 0, qrisTotal: 0 };
 
@@ -85,6 +87,7 @@ export const reportService = {
       .select('created_at, total_amount')
       .gte('created_at', start.toISOString())
       .lte('created_at', end.toISOString())
+      .neq('status', 'VOIDED') // Exclude refunded
       .order('created_at', { ascending: true });
 
     if (!data) return [];
@@ -129,8 +132,8 @@ export const reportService = {
       const startYesterday = new Date(yesterday.setHours(0,0,0,0)).toISOString();
       const endYesterday = new Date(yesterday.setHours(23,59,59,999)).toISOString();
 
-      const { data: todayData } = await supabase.from('transactions').select('total_amount').gte('created_at', startToday).lte('created_at', endToday);
-      const { data: yesterdayData } = await supabase.from('transactions').select('total_amount').gte('created_at', startYesterday).lte('created_at', endYesterday);
+      const { data: todayData } = await supabase.from('transactions').select('total_amount').gte('created_at', startToday).lte('created_at', endToday).neq('status', 'VOIDED');
+      const { data: yesterdayData } = await supabase.from('transactions').select('total_amount').gte('created_at', startYesterday).lte('created_at', endYesterday).neq('status', 'VOIDED');
 
       const todaySales = todayData?.reduce((acc, t) => acc + t.total_amount, 0) || 0;
       const yesterdaySales = yesterdayData?.reduce((acc, t) => acc + t.total_amount, 0) || 0;

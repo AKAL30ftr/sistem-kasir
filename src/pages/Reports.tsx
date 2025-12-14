@@ -26,15 +26,12 @@ export default function Reports() {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateRange]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // 1. Load Stats (Should ideally respect date range, but currently getTodayStats is hardcoded to today in service. 
-      //    We might need to update service if we want multi-day stats, but for now let's assume 'Today' or just use the transaction sum)
-      //    Actually, let's calculate stats from the fetched transactions for accuracy with the date filter.
-      
       const start = new Date(dateRange.start);
       start.setHours(0,0,0,0);
       const end = new Date(dateRange.end);
@@ -43,13 +40,15 @@ export default function Reports() {
       const txs = await reportService.getTransactions(start, end);
       setTransactions(txs);
 
-      // Calculate stats client-side for the filtered range
-      const newStats = txs.reduce((acc, t) => ({
-        totalSales: acc.totalSales + t.total_amount,
-        count: acc.count + 1,
-        cashTotal: acc.cashTotal + (t.payment_method === 'CASH' ? t.total_amount : 0),
-        qrisTotal: acc.qrisTotal + (t.payment_method === 'QRIS' ? t.total_amount : 0)
-      }), { totalSales: 0, count: 0, cashTotal: 0, qrisTotal: 0 });
+      // Calculate stats client-side for the filtered range (exclude refunded)
+      const newStats = txs
+        .filter(t => t.status !== 'VOIDED')
+        .reduce((acc, t) => ({
+          totalSales: acc.totalSales + t.total_amount,
+          count: acc.count + 1,
+          cashTotal: acc.cashTotal + (t.payment_method === 'CASH' ? t.total_amount : 0),
+          qrisTotal: acc.qrisTotal + (t.payment_method === 'QRIS' ? t.total_amount : 0)
+        }), { totalSales: 0, count: 0, cashTotal: 0, qrisTotal: 0 });
       
       setStats(newStats);
 
@@ -67,14 +66,15 @@ export default function Reports() {
       return;
     }
     
-    const headers = ["Date", "Time", "Transaction ID", "Total Amount", "Payment Method", "Items"];
+    const headers = ["Date", "Time", "Transaction ID", "Total Amount", "Payment Method", "Status", "Items"];
     const csvContent = [
       headers.join(","),
       ...transactions.map(t => {
         const date = new Date(t.created_at).toLocaleDateString('id-ID');
         const time = new Date(t.created_at).toLocaleTimeString('id-ID');
         const items = t.items.map(i => `${i.quantity}x ${i.name}`).join("; ");
-        return `${date},${time},${t.id},${t.total_amount},${t.payment_method},"${items}"`;
+        const status = t.status === 'VOIDED' ? 'REFUNDED' : 'COMPLETED';
+        return `${date},${time},${t.id},${t.total_amount},${t.payment_method},${status},"${items}"`;
       })
     ].join("\n");
 
@@ -189,7 +189,7 @@ export default function Reports() {
                  <th className="px-6 py-4">Order ID</th>
                  <th className="px-6 py-4">Items</th>
                  <th className="px-6 py-4">Amount</th>
-                 <th className="px-6 py-4">Payment</th>
+                 <th className="px-6 py-4">Status</th>
                  <th className="px-6 py-4 text-right">Action</th>
                </tr>
              </thead>
@@ -199,26 +199,34 @@ export default function Reports() {
                ) : transactions.length === 0 ? (
                    <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-500">No transactions found for this period</td></tr>
                ) : (
-                   transactions.map((t) => (
-                     <tr key={t.id} className="hover:bg-gray-50 transition-colors">
+                   transactions.map((t) => {
+                     const isRefunded = t.status === 'VOIDED';
+                     return (
+                     <tr key={t.id} className={`hover:bg-gray-50 transition-colors ${isRefunded ? 'opacity-60 bg-red-50' : ''}`}>
                        <td className="px-6 py-4 text-gray-600">
                          {new Date(t.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                        </td>
                        <td className="px-6 py-4 font-mono text-xs text-gray-500">
                          {t.id?.slice(0, 8)}...
                        </td>
-                       <td className="px-6 py-4 text-gray-800 max-w-xs truncate">
+                       <td className={`px-6 py-4 text-gray-800 max-w-xs truncate ${isRefunded ? 'line-through' : ''}`}>
                          {t.items.map(i => `${i.quantity} ${i.name}`).join(', ')}
                        </td>
-                       <td className="px-6 py-4 font-medium text-gray-900">
+                       <td className={`px-6 py-4 font-medium ${isRefunded ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
                          Rp {t.total_amount.toLocaleString()}
                        </td>
                        <td className="px-6 py-4">
-                         <span className={`px-2 py-1 rounded text-xs font-bold ${
-                             t.payment_method === 'CASH' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'
-                         }`}>
-                             {t.payment_method}
-                         </span>
+                         {isRefunded ? (
+                           <span className="px-2 py-1 rounded text-xs font-bold bg-red-100 text-red-700">
+                             REFUNDED
+                           </span>
+                         ) : (
+                           <span className={`px-2 py-1 rounded text-xs font-bold ${
+                               t.payment_method === 'CASH' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'
+                           }`}>
+                               {t.payment_method}
+                           </span>
+                         )}
                        </td>
                        <td className="px-6 py-4 text-right">
                          <button 
@@ -229,7 +237,8 @@ export default function Reports() {
                          </button>
                        </td>
                      </tr>
-                   ))
+                     );
+                   })
                )}
              </tbody>
            </table>
@@ -246,4 +255,3 @@ export default function Reports() {
     </div>
   );
 }
-

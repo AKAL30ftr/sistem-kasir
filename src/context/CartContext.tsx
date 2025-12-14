@@ -1,21 +1,37 @@
-import { createContext, useContext, useState, type ReactNode, useMemo } from 'react';
-import type { Product, CartItem } from '../types';
+import { createContext, useContext, useState, type ReactNode, useMemo, useCallback } from 'react';
+import type { Product, CartItem, ParkedOrder } from '../types';
 import toast from 'react-hot-toast';
+
+const PARKED_ORDERS_KEY = 'pos_parked_orders';
 
 interface CartContextType {
   cartItems: CartItem[];
   addToCart: (product: Product) => void;
-  removeFromCart: (itemsKw: string) => void; // Using itemsKw (id)
+  removeFromCart: (itemsKw: string) => void;
   updateQuantity: (itemId: string, delta: number) => void;
   clearCart: () => void;
   cartTotal: number;
   totalItems: number;
+  // Park/Resume functions
+  parkOrder: () => string | null;
+  getParkedOrders: () => ParkedOrder[];
+  resumeOrder: (parkId: string) => void;
+  deleteParkedOrder: (parkId: string) => void;
+  parkedOrderCount: number;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [parkedOrderCount, setParkedOrderCount] = useState(() => {
+    try {
+      const stored = localStorage.getItem(PARKED_ORDERS_KEY);
+      return stored ? JSON.parse(stored).length : 0;
+    } catch {
+      return 0;
+    }
+  });
 
   const addToCart = (product: Product) => {
     if (!product.id) return;
@@ -28,7 +44,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const existing = prev.find(item => item.id === product.id);
 
       if (existing) {
-        // Build logic: check if adding 1 exceeds stock
         if (existing.quantity + 1 > product.stock_quantity) {
           toast.error(`Only ${product.stock_quantity} available in stock!`);
           return prev;
@@ -54,16 +69,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return prev.map(item => {
         if (item.id === itemId) {
           const newQty = item.quantity + delta;
-
-          // Remove if 0
-          if (newQty <= 0) return { ...item, quantity: 0 }; // We'll filter later or handle in UI
-
-          // Validate stock
+          if (newQty <= 0) return { ...item, quantity: 0 };
           if (newQty > item.stock_quantity) {
             toast.error(`Cannot exceed stock (${item.stock_quantity})`);
             return item;
           }
-
           return { ...item, quantity: newQty };
         }
         return item;
@@ -74,6 +84,73 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const clearCart = () => {
     setCartItems([]);
   };
+
+  // === PARK/RESUME FUNCTIONS ===
+
+  const getParkedOrders = useCallback((): ParkedOrder[] => {
+    try {
+      const stored = localStorage.getItem(PARKED_ORDERS_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const parkOrder = useCallback((): string | null => {
+    if (cartItems.length === 0) {
+      toast.error('Cart is empty');
+      return null;
+    }
+
+    const parkId = `park_${Date.now()}`;
+    const parkedOrder: ParkedOrder = {
+      id: parkId,
+      items: [...cartItems],
+      total: cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+      parkedAt: new Date().toISOString()
+    };
+
+    const existing = getParkedOrders();
+    const updated = [...existing, parkedOrder];
+    localStorage.setItem(PARKED_ORDERS_KEY, JSON.stringify(updated));
+    
+    setCartItems([]);
+    setParkedOrderCount(updated.length);
+    toast.success('Order parked');
+    return parkId;
+  }, [cartItems, getParkedOrders]);
+
+  const resumeOrder = useCallback((parkId: string) => {
+    const orders = getParkedOrders();
+    const order = orders.find(o => o.id === parkId);
+    
+    if (!order) {
+      toast.error('Parked order not found');
+      return;
+    }
+
+    // If cart has items, ask to merge or replace (for now, replace)
+    if (cartItems.length > 0) {
+      // Simple replace for MVP
+      toast('Replacing current cart with parked order', { icon: '🔄' });
+    }
+
+    setCartItems(order.items);
+    
+    // Remove from parked
+    const remaining = orders.filter(o => o.id !== parkId);
+    localStorage.setItem(PARKED_ORDERS_KEY, JSON.stringify(remaining));
+    setParkedOrderCount(remaining.length);
+    toast.success('Order resumed');
+  }, [cartItems, getParkedOrders]);
+
+  const deleteParkedOrder = useCallback((parkId: string) => {
+    const orders = getParkedOrders();
+    const remaining = orders.filter(o => o.id !== parkId);
+    localStorage.setItem(PARKED_ORDERS_KEY, JSON.stringify(remaining));
+    setParkedOrderCount(remaining.length);
+    toast.success('Parked order deleted');
+  }, [getParkedOrders]);
 
   const cartTotal = useMemo(() => {
     return cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -91,7 +168,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       updateQuantity,
       clearCart,
       cartTotal,
-      totalItems
+      totalItems,
+      parkOrder,
+      getParkedOrders,
+      resumeOrder,
+      deleteParkedOrder,
+      parkedOrderCount
     }}>
       {children}
     </CartContext.Provider>
